@@ -132,6 +132,7 @@
 	style.textContent = '\n' +
 		'#helpfulhorse-root * { box-sizing: border-box; font-family: sans-serif; }\n' +
 		'#hh-horse { position:fixed; width:' + HORSE_SIZE + 'px; height:' + HORSE_SIZE + 'px; pointer-events:auto; cursor:grab; user-select:none; -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; touch-action:none; }\n' +
+		'.hh-walk { position:fixed; pointer-events:none; user-select:none; -webkit-user-drag:none; opacity:0; }\n' +
 		'#hh-bubble { position:fixed; display:none; pointer-events:none; }\n' +
 		'#hh-bubble img { width:100%; height:100%; display:block; }\n' +
 		'#hh-bubble-text { position:absolute; color:#111; font-size:13px; line-height:1.3; overflow:hidden; }\n' +
@@ -151,6 +152,21 @@
 	var horseImg = document.createElement('img');
 	horseImg.id = 'hh-horse';
 	horseImg.draggable = false;
+
+	// Persistent per-direction walk layers. Each is its own <img> whose src is
+	// set once and never swapped, so its gif keeps running and RESUMES mid-
+	// stride when switched back to - unlike re-assigning one <img>'s src, which
+	// restarts the gif from frame 0 on every switch. This mirrors the original
+	// desktop app, which keeps a QMovie per direction and only setMovie()s the
+	// active one (no stop/restart) while walking.
+	var WALK_NAMES = ['walkinleft', 'walkinright', 'walkinup', 'walkindown'];
+	var walkLayers = {};
+	WALK_NAMES.forEach(function (name) {
+		var img = document.createElement('img');
+		img.className = 'hh-walk';
+		img.draggable = false;
+		walkLayers[name] = img;
+	});
 
 	var bubble = document.createElement('div');
 	bubble.id = 'hh-bubble';
@@ -174,6 +190,7 @@
 
 	root.appendChild(style);
 	root.appendChild(horseImg);
+	WALK_NAMES.forEach(function (name) { root.appendChild(walkLayers[name]); });
 	root.appendChild(bubble);
 	root.appendChild(menu);
 	root.appendChild(notepad);
@@ -204,6 +221,13 @@
 		pos.y = Math.max(0, Math.min(window.innerHeight - HORSE_SIZE, y));
 		horseImg.style.left = pos.x + 'px';
 		horseImg.style.top = pos.y + 'px';
+		WALK_NAMES.forEach(function (name) {
+			var img = walkLayers[name];
+			img.style.left = pos.x + 'px';
+			img.style.top = pos.y + 'px';
+			img.style.width = HORSE_SIZE + 'px';
+			img.style.height = HORSE_SIZE + 'px';
+		});
 		positionBubble();
 	}
 
@@ -224,15 +248,32 @@
 		return basePath + GIFS[name];
 	}
 
+	function hideWalkLayers() {
+		WALK_NAMES.forEach(function (n) { walkLayers[n].style.opacity = '0'; });
+	}
+
 	function playGif(name) {
+		if (walkLayers[name]) {
+			// Walking: reveal this direction's persistent, continuously-running
+			// layer and hide the others. The layer's gif is never re-src'd, so
+			// it resumes mid-stride instead of resetting to frame 0 on each
+			// direction change - which is what made switching feel laggy.
+			horseImg.style.opacity = '0';
+			WALK_NAMES.forEach(function (n) {
+				walkLayers[n].style.opacity = (n === name) ? '1' : '0';
+			});
+			current = name;
+			return;
+		}
+		// One-shot / idle animations (blink, wave, joke, fact, ...) play on the
+		// interactive horse element and restart from frame 0, matching the
+		// original's stop()+start() for queued animations.
+		hideWalkLayers();
+		horseImg.style.opacity = '1';
 		if (current === name) {
-			// Re-assigning the exact same src string is a no-op in every
-			// browser, so to restart the gif from its first frame we have to
-			// clear it first. The URL itself stays unchanged (no cache-busting
-			// query string), so the browser serves the reload from its own
-			// image cache instead of re-fetching the file over the network -
-			// that network re-fetch on every direction change was what made
-			// switching feel slow.
+			// Re-assigning the same src is a no-op, so to restart the gif from
+			// frame 0 we clear it first. The URL is unchanged (no cache-bust),
+			// so the reload is served from the browser's image cache.
 			horseImg.src = '';
 		}
 		current = name;
@@ -544,7 +585,10 @@
 		stopWalking();
 		if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
 		queue = [];
+		hideWalkLayers();
+		horseImg.style.opacity = '1';
 		horseImg.src = basePath + GRAB_IMG;
+		current = 'grab';
 		horseImg.style.cursor = 'grabbing';
 		dragOffset.x = x - pos.x;
 		dragOffset.y = y - pos.y;
@@ -656,6 +700,7 @@
 			}));
 			menu.appendChild(menuButton('Please stop following me you wonderful creature', function () {
 				resetHorse();
+				queueAnimation({ type: 'gif', name: 'blink', duration: 0 });
 			}));
 		} else if (isTyping) {
 			menu.appendChild(menuButton('STOP', function () {
@@ -748,7 +793,10 @@
 		tellStory: tellStory,
 		wave: wave,
 		followCursor: followCursor,
-		stopFollowing: function () { resetHorse(); },
+		stopFollowing: function () {
+			resetHorse();
+			queueAnimation({ type: 'gif', name: 'blink', duration: 0 });
+		},
 		destroy: function () {
 			api.stop();
 			root.remove();
@@ -760,6 +808,7 @@
 	function boot() {
 		mount();
 		preloadGifs();
+		WALK_NAMES.forEach(function (name) { walkLayers[name].src = gifUrl(name); });
 		setPos(pos.x, pos.y);
 		introduction();
 		if (AUTO_START) api.start();
