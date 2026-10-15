@@ -280,10 +280,35 @@
 		horseImg.src = gifUrl(name);
 	}
 
-	function preloadGifs() {
-		Object.keys(GIFS).forEach(function (name) {
-			new Image().src = gifUrl(name);
+	function loadImg(name) {
+		return new Promise(function (resolve) {
+			var img = new Image();
+			img.onload = img.onerror = function () { resolve(); };
+			img.src = gifUrl(name);
 		});
+	}
+
+	// Load assets in priority order. The intro needs 'wave' first and 'speak'
+	// right after; firing all ~13MB of gifs at once (as a flat preload does)
+	// starves those two behind the big idle-animation gifs, so on a cold cache
+	// 'speak' wouldn't finish downloading until long after the intro tried to
+	// switch to it - the horse then froze on the wave's last frame for several
+	// seconds. So: 'wave'+'speak' are fetched first and gate the intro, then
+	// the walk directions, then the remaining one-shot gifs stream in.
+	function preloadDeferred() {
+		var steps = [];
+		WALK_NAMES.forEach(function (name) {
+			steps.push(function () {
+				return new Promise(function (res) {
+					var img = walkLayers[name];
+					img.onload = img.onerror = function () { res(); };
+					img.src = gifUrl(name);
+				});
+			});
+		});
+		['blink', 'joke', 'mic', 'fact', 'frown', 'smile', 'punchline', 'picture', 'keyboard-equip', 'horse-typing']
+			.forEach(function (name) { steps.push(function () { return loadImg(name); }); });
+		(function run(i) { if (i < steps.length) steps[i]().then(function () { run(i + 1); }); })(0);
 	}
 
 	// queue items: {type:'gif', name, duration} | {type:'bubble', text} |
@@ -538,16 +563,16 @@
 		queueAnimation({ type: 'gif', name: 'speak', duration: 3000 });
 		pauseHorse();
 		queueAnimation({ type: 'bubble', text: 'Its nice to meet you! My name is Helpful Horse!' });
-		queueAnimation({ type: 'gif', name: 'speak', duration: 4000 });
+		queueAnimation({ type: 'gif', name: 'speak', duration: 5000 });
 		pauseHorse();
 		queueAnimation({ type: 'bubble', text: "I'm your very best computer friend that lives on this page!" });
-		queueAnimation({ type: 'gif', name: 'speak', duration: 4000 });
+		queueAnimation({ type: 'gif', name: 'speak', duration: 5000 });
 		pauseHorse();
 		queueAnimation({ type: 'bubble', text: "I'm here to protect you against the dangers of the internet." });
-		queueAnimation({ type: 'gif', name: 'speak', duration: 4000 });
+		queueAnimation({ type: 'gif', name: 'speak', duration: 5000 });
 		pauseHorse();
 		queueAnimation({ type: 'bubble', text: "But don't worry, we will still have fun together along the way!" });
-		queueAnimation({ type: 'gif', name: 'joke', duration: 4000 });
+		queueAnimation({ type: 'gif', name: 'joke', duration: 5000 });
 	}
 
 	// ---- random idle behaviour -----------------------------------------------
@@ -807,11 +832,17 @@
 
 	function boot() {
 		mount();
-		preloadGifs();
-		WALK_NAMES.forEach(function (name) { walkLayers[name].src = gifUrl(name); });
 		setPos(pos.x, pos.y);
-		introduction();
-		if (AUTO_START) api.start();
+		// Wait (briefly) for the intro-critical gifs so the wave and the switch
+		// to talking both display on time, then start. A short timeout falls
+		// back so a slow or missing asset never hangs the intro.
+		var critical = Promise.all([loadImg('wave'), loadImg('speak')]);
+		var ready = Promise.race([critical, new Promise(function (r) { setTimeout(r, 4000); })]);
+		ready.then(function () {
+			introduction();
+			if (AUTO_START) api.start();
+			preloadDeferred();
+		});
 	}
 
 	if (document.body) {
