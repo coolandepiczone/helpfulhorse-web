@@ -220,10 +220,29 @@
 		bubbleText.style.height = (h * 0.6) + 'px';
 	}
 
+	function gifUrl(name) {
+		return basePath + GIFS[name];
+	}
+
 	function playGif(name) {
+		if (current === name) {
+			// Re-assigning the exact same src string is a no-op in every
+			// browser, so to restart the gif from its first frame we have to
+			// clear it first. The URL itself stays unchanged (no cache-busting
+			// query string), so the browser serves the reload from its own
+			// image cache instead of re-fetching the file over the network -
+			// that network re-fetch on every direction change was what made
+			// switching feel slow.
+			horseImg.src = '';
+		}
 		current = name;
-		// reassigning src restarts the gif from its first frame in all browsers
-		horseImg.src = basePath + GIFS[name] + '?r=' + Math.random().toString(36).slice(2);
+		horseImg.src = gifUrl(name);
+	}
+
+	function preloadGifs() {
+		Object.keys(GIFS).forEach(function (name) {
+			new Image().src = gifUrl(name);
+		});
 	}
 
 	// queue items: {type:'gif', name, duration} | {type:'bubble', text} |
@@ -740,6 +759,7 @@
 
 	function boot() {
 		mount();
+		preloadGifs();
 		setPos(pos.x, pos.y);
 		introduction();
 		if (AUTO_START) api.start();
