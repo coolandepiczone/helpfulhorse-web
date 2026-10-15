@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Helpful Horse (web) - demo</title>
+	<style>
+		html, body { margin: 0; min-height: 100vh; background: transparent; }
+		body {
+			font-family: system-ui, sans-serif;
+			color: #222;
+			background: linear-gradient(135deg, #dff3e3, #cfe8ff);
+			padding: 48px 24px;
+		}
+		.card {
+			max-width: 640px;
+			margin: 0 auto;
+			background: rgba(255, 255, 255, 0.85);
+			border-radius: 12px;
+			padding: 28px 32px;
+			box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+		}
+		code { background: #eee; padding: 2px 6px; border-radius: 4px; }
+		pre { background: #1e1e1e; color: #e8e8e8; padding: 14px; border-radius: 8px; overflow-x: auto; }
+	</style>
+</head>
+<body>
+	<div class="card">
+		<h1>Helpful Horse 🐴</h1>
+		<p>
+			This page is just a normal webpage with ordinary content. The horse you
+			(should) see walking around is injected by a single script tag -
+			everything it does lives inside <code>#helpfulhorse-root</code>, it never
+			touches the rest of the page, and clicks pass straight through it except
+			when they land on the horse itself.
+		</p>
+		<p>Right-click the horse for a menu, or just drag it around.</p>
+		<p>To add it to your own site:</p>
+		<pre>&lt;script src="helpfulhorse.js" defer&gt;&lt;/script&gt;</pre>
+		<p>See <code>README.md</code> for hosting and configuration options.</p>
+	</div>
+
+	<script src="helpfulhorse.js" defer></script>
+</body>
+</html>
