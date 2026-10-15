@@ -131,7 +131,7 @@
 	var style = document.createElement('style');
 	style.textContent = '\n' +
 		'#helpfulhorse-root * { box-sizing: border-box; font-family: sans-serif; }\n' +
-		'#hh-horse { position:fixed; width:' + HORSE_SIZE + 'px; height:' + HORSE_SIZE + 'px; pointer-events:auto; cursor:grab; user-select:none; -webkit-user-drag:none; touch-action:none; }\n' +
+		'#hh-horse { position:fixed; width:' + HORSE_SIZE + 'px; height:' + HORSE_SIZE + 'px; pointer-events:auto; cursor:grab; user-select:none; -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; touch-action:none; }\n' +
 		'#hh-bubble { position:fixed; display:none; pointer-events:none; }\n' +
 		'#hh-bubble img { width:100%; height:100%; display:block; }\n' +
 		'#hh-bubble-text { position:absolute; color:#111; font-size:13px; line-height:1.3; overflow:hidden; }\n' +
@@ -566,6 +566,11 @@
 
 	horseImg.addEventListener('touchstart', function (e) {
 		if (e.touches.length !== 1) return;
+		// claim the gesture immediately instead of waiting for touchmove to
+		// cross the drag threshold - on some mobile browsers, anything that
+		// doesn't preventDefault on touchstart can lose the gesture to the
+		// page's own scroll/zoom handling before the threshold is reached
+		e.preventDefault();
 		var t = e.touches[0];
 		touchStart = { x: t.clientX, y: t.clientY };
 		touchMoved = false;
@@ -576,7 +581,7 @@
 		longPressTimer = setTimeout(function () {
 			if (!touchMoved) showMenu(touchStart.x, touchStart.y);
 		}, LONG_PRESS_MS);
-	}, { passive: true });
+	}, { passive: false });
 
 	window.addEventListener('touchmove', function (e) {
 		if (!touchStart || e.touches.length !== 1) return;
