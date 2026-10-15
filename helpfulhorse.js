@@ -131,7 +131,7 @@
 	var style = document.createElement('style');
 	style.textContent = '\n' +
 		'#helpfulhorse-root * { box-sizing: border-box; font-family: sans-serif; }\n' +
-		'#hh-horse { position:fixed; width:' + HORSE_SIZE + 'px; height:' + HORSE_SIZE + 'px; pointer-events:auto; cursor:grab; user-select:none; -webkit-user-drag:none; }\n' +
+		'#hh-horse { position:fixed; width:' + HORSE_SIZE + 'px; height:' + HORSE_SIZE + 'px; pointer-events:auto; cursor:grab; user-select:none; -webkit-user-drag:none; touch-action:none; }\n' +
 		'#hh-bubble { position:fixed; display:none; pointer-events:none; }\n' +
 		'#hh-bubble img { width:100%; height:100%; display:block; }\n' +
 		'#hh-bubble-text { position:absolute; color:#111; font-size:13px; line-height:1.3; overflow:hidden; }\n' +
@@ -139,7 +139,7 @@
 		'#hh-menu button { display:block; width:100%; text-align:left; background:none; border:none; padding:6px 14px; cursor:pointer; color:#111; }\n' +
 		'#hh-menu button:hover { background:#b0b0b0; }\n' +
 		'#hh-notepad { position:fixed; display:none; width:360px; min-height:220px; background:#fff; border:1px solid #888; box-shadow:0 4px 16px rgba(0,0,0,.35); pointer-events:auto; }\n' +
-		'#hh-notepad .hh-titlebar { background:#2a63c7; color:#fff; font-size:12px; padding:4px 8px; cursor:move; display:flex; justify-content:space-between; }\n' +
+		'#hh-notepad .hh-titlebar { background:#2a63c7; color:#fff; font-size:12px; padding:4px 8px; cursor:move; touch-action:none; display:flex; justify-content:space-between; }\n' +
 		'#hh-notepad .hh-titlebar button { background:none; border:none; color:#fff; cursor:pointer; font-size:12px; }\n' +
 		'#hh-notepad textarea { width:100%; height:200px; border:none; resize:none; outline:none; font-family:monospace; font-size:13px; padding:8px; }\n' +
 		'#hh-dialog { position:fixed; display:none; top:50%; left:50%; transform:translate(-50%,-50%); width:320px; background:#f4f4f4; border:1px solid #888; border-radius:4px; box-shadow:0 4px 20px rgba(0,0,0,.4); pointer-events:auto; font-size:13px; }\n' +
@@ -520,16 +520,27 @@
 
 	var dragOffset = { x: 0, y: 0 };
 
-	horseImg.addEventListener('mousedown', function (e) {
-		if (e.button !== 0) return;
+	function startDrag(x, y) {
 		isDragging = true;
 		stopWalking();
 		if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
 		queue = [];
 		horseImg.src = basePath + GRAB_IMG;
 		horseImg.style.cursor = 'grabbing';
-		dragOffset.x = e.clientX - pos.x;
-		dragOffset.y = e.clientY - pos.y;
+		dragOffset.x = x - pos.x;
+		dragOffset.y = y - pos.y;
+	}
+
+	function endDrag() {
+		if (!isDragging) return;
+		isDragging = false;
+		horseImg.style.cursor = 'grab';
+		queueAnimation({ type: 'gif', name: 'blink', duration: 0 });
+	}
+
+	horseImg.addEventListener('mousedown', function (e) {
+		if (e.button !== 0) return;
+		startDrag(e.clientX, e.clientY);
 		e.preventDefault();
 	});
 
@@ -541,13 +552,60 @@
 		}
 	});
 
-	window.addEventListener('mouseup', function () {
-		if (isDragging) {
-			isDragging = false;
-			horseImg.style.cursor = 'grab';
-			queueAnimation({ type: 'gif', name: 'blink', duration: 0 });
+	window.addEventListener('mouseup', endDrag);
+
+	// touch: a short tap with no real movement does nothing (mirrors a mouse
+	// click+release that doesn't drag); move past the threshold and it's a
+	// drag; hold still past LONG_PRESS_MS and it opens the context menu,
+	// since touch devices have no right-click.
+	var TAP_MOVE_THRESHOLD = 8;
+	var LONG_PRESS_MS = 500;
+	var touchStart = null;
+	var touchMoved = false;
+	var longPressTimer = null;
+
+	horseImg.addEventListener('touchstart', function (e) {
+		if (e.touches.length !== 1) return;
+		var t = e.touches[0];
+		touchStart = { x: t.clientX, y: t.clientY };
+		touchMoved = false;
+		mouse.x = t.clientX;
+		mouse.y = t.clientY;
+		dragOffset.x = t.clientX - pos.x;
+		dragOffset.y = t.clientY - pos.y;
+		longPressTimer = setTimeout(function () {
+			if (!touchMoved) showMenu(touchStart.x, touchStart.y);
+		}, LONG_PRESS_MS);
+	}, { passive: true });
+
+	window.addEventListener('touchmove', function (e) {
+		if (!touchStart || e.touches.length !== 1) return;
+		var t = e.touches[0];
+		mouse.x = t.clientX;
+		mouse.y = t.clientY;
+		if (!touchMoved) {
+			var dx = t.clientX - touchStart.x;
+			var dy = t.clientY - touchStart.y;
+			if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD) {
+				touchMoved = true;
+				clearTimeout(longPressTimer);
+				startDrag(t.clientX, t.clientY);
+			}
 		}
-	});
+		if (isDragging) {
+			setPos(t.clientX - dragOffset.x, t.clientY - dragOffset.y);
+			e.preventDefault();
+		}
+	}, { passive: false });
+
+	function onTouchEnd() {
+		clearTimeout(longPressTimer);
+		endDrag();
+		touchStart = null;
+		touchMoved = false;
+	}
+	window.addEventListener('touchend', onTouchEnd);
+	window.addEventListener('touchcancel', onTouchEnd);
 
 	function hideMenu() {
 		menu.style.display = 'none';
@@ -564,8 +622,7 @@
 		return b;
 	}
 
-	horseImg.addEventListener('contextmenu', function (e) {
-		e.preventDefault();
+	function showMenu(x, y) {
 		menu.innerHTML = '';
 
 		if (isFollowing) {
@@ -588,35 +645,62 @@
 			menu.appendChild(menuButton('Tell me a fact', tellFact));
 		}
 
-		menu.style.left = e.clientX + 'px';
-		menu.style.top = e.clientY + 'px';
+		menu.style.left = x + 'px';
+		menu.style.top = y + 'px';
 		menu.style.display = 'block';
+	}
+
+	horseImg.addEventListener('contextmenu', function (e) {
+		e.preventDefault();
+		showMenu(e.clientX, e.clientY);
 	});
 
 	document.addEventListener('mousedown', function (e) {
 		if (menu.style.display === 'block' && !menu.contains(e.target)) hideMenu();
 	});
+	document.addEventListener('touchstart', function (e) {
+		if (menu.style.display === 'block' && !menu.contains(e.target)) hideMenu();
+	}, { passive: true });
 
 	window.addEventListener('resize', function () {
 		setPos(pos.x, pos.y);
 	});
 
-	notepad.addEventListener('mousedown', function (e) {
-		if (!e.target.closest('.hh-titlebar')) return;
-		var startX = e.clientX, startY = e.clientY;
+	function dragNotepad(startX, startY) {
 		var origX = parseFloat(notepad.style.left) || 0;
 		var origY = parseFloat(notepad.style.top) || 0;
-		function onMove(ev) {
-			notepad.style.left = (origX + ev.clientX - startX) + 'px';
-			notepad.style.top = (origY + ev.clientY - startY) + 'px';
+		function onMove(x, y) {
+			notepad.style.left = (origX + x - startX) + 'px';
+			notepad.style.top = (origY + y - startY) + 'px';
 		}
-		function onUp() {
-			window.removeEventListener('mousemove', onMove);
-			window.removeEventListener('mouseup', onUp);
+		function onMouseMove(ev) { onMove(ev.clientX, ev.clientY); }
+		function onTouchMove(ev) {
+			if (ev.touches.length !== 1) return;
+			onMove(ev.touches[0].clientX, ev.touches[0].clientY);
+			ev.preventDefault();
 		}
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
+		function cleanup() {
+			window.removeEventListener('mousemove', onMouseMove);
+			window.removeEventListener('mouseup', cleanup);
+			window.removeEventListener('touchmove', onTouchMove);
+			window.removeEventListener('touchend', cleanup);
+			window.removeEventListener('touchcancel', cleanup);
+		}
+		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mouseup', cleanup);
+		window.addEventListener('touchmove', onTouchMove, { passive: false });
+		window.addEventListener('touchend', cleanup);
+		window.addEventListener('touchcancel', cleanup);
+	}
+
+	notepad.addEventListener('mousedown', function (e) {
+		if (!e.target.closest('.hh-titlebar')) return;
+		dragNotepad(e.clientX, e.clientY);
 	});
+	notepad.addEventListener('touchstart', function (e) {
+		if (!e.target.closest('.hh-titlebar') || e.touches.length !== 1) return;
+		dragNotepad(e.touches[0].clientX, e.touches[0].clientY);
+	}, { passive: true });
 
 	notepad.querySelector('#hh-notepad-close').addEventListener('click', function () {
 		notepad.style.display = 'none';
