@@ -472,28 +472,28 @@
 		resetHorse();
 		var joke = pick(JOKES);
 		var apology = pick(APOLOGIES);
-		queueAnimation({ type: 'gif', name: 'mic', duration: 1500 });
+		queueAnimation({ type: 'gif', name: 'mic', duration: 3700 });
 		queueAnimation({ type: 'bubble', text: joke.setup });
-		queueAnimation({ type: 'gif', name: 'joke', duration: 4000 });
+		queueAnimation({ type: 'gif', name: 'joke', duration: 6000 });
 		queueAnimation({ type: 'bubble', text: joke.punchline });
 		queueAnimation({ type: 'gif', name: 'punchline', duration: 3000 });
 		queueAnimation({ type: 'hide_bubble' });
-		queueAnimation({ type: 'gif', name: 'blink', duration: 1500 });
+		queueAnimation({ type: 'gif', name: 'blink', duration: 2000 });
 		queueAnimation({ type: 'bubble', text: apology });
-		queueAnimation({ type: 'gif', name: 'speak', duration: 3000 });
+		queueAnimation({ type: 'gif', name: 'speak', duration: 4000 });
 		queueAnimation({ type: 'hide_bubble' });
 	}
 
 	function tellFact() {
 		resetHorse();
 		var f = pick(FACTS);
-		queueAnimation({ type: 'gif', name: 'blink', duration: 800 });
+		queueAnimation({ type: 'gif', name: 'blink', duration: 1000 });
 		queueAnimation({ type: 'bubble', text: 'Oh, this is interesting!' });
-		queueAnimation({ type: 'gif', name: 'fact', duration: 2500 });
+		queueAnimation({ type: 'gif', name: 'fact', duration: 3000 });
 		queueAnimation({ type: 'bubble', text: f.fact });
-		queueAnimation({ type: 'gif', name: 'fact', duration: 5000 });
+		queueAnimation({ type: 'gif', name: 'fact', duration: 8000 });
 		queueAnimation({ type: 'bubble', text: f.remark });
-		queueAnimation({ type: 'gif', name: 'speak', duration: 3500 });
+		queueAnimation({ type: 'gif', name: 'speak', duration: 5000 });
 		queueAnimation({ type: 'hide_bubble' });
 	}
 
@@ -505,9 +505,9 @@
 		isTyping = true;
 
 		var i = 0;
-		var speed = 25; // ms per character
+		var speed = 25; // ms per character (original typingSpeed 0.025s)
 
-		(function typeNext() {
+		function typeNext() {
 			if (!isTyping || i >= text.length) {
 				isTyping = false;
 				return;
@@ -516,23 +516,25 @@
 			notepadTextarea.scrollTop = notepadTextarea.scrollHeight;
 			i++;
 			setTimeout(typeNext, speed);
-		})();
+		}
+		// original typeChunk() sleeps 0.3s before it starts typing
+		setTimeout(typeNext, 300);
 	}
 
 	function tellStory() {
 		resetHorse();
 		var story = pick(STORIES);
-		queueAnimation({ type: 'gif', name: 'keyboard-equip', duration: 2500 });
+		queueAnimation({ type: 'gif', name: 'keyboard-equip', duration: 4000 });
 		queueAnimation({ type: 'notepad', text: story });
 		queueAnimation({ type: 'gif', name: 'horse-typing', duration: Math.ceil(story.length * 25) });
-		queueAnimation({ type: 'gif', name: 'blink', duration: 2000 });
+		queueAnimation({ type: 'gif', name: 'blink', duration: 3000 });
 		queueAnimation({ type: 'bubble', text: 'My masterpiece.' });
 		queueAnimation({ type: 'gif', name: 'speak', duration: 1000 });
 		queueAnimation({ type: 'hide_bubble' });
 	}
 
 	function wave() {
-		queueAnimation({ type: 'gif', name: 'wave', duration: 2500 });
+		queueAnimation({ type: 'gif', name: 'wave', duration: 3000 });
 	}
 
 	function askForPerms() {
@@ -549,9 +551,9 @@
 			btn.addEventListener('click', function () {
 				dialog.style.display = 'none';
 				if (btn.getAttribute('data-a') === 'yes') {
-					queueAnimation({ type: 'gif', name: 'smile', duration: 2500 });
+					queueAnimation({ type: 'gif', name: 'smile', duration: 3000 });
 				} else {
-					queueAnimation({ type: 'gif', name: 'frown', duration: 2500 });
+					queueAnimation({ type: 'gif', name: 'frown', duration: 3000 });
 				}
 			});
 		});
