@@ -206,6 +206,8 @@
 	var queue = [];
 	var queueTimer = null;
 	var bubbleTimer = null;
+	var notepadTimer = null;
+	var dialogTimer = null;
 	var isFollowing = false;
 	var isTyping = false;
 	var isDragging = false;
@@ -497,12 +499,21 @@
 		queueAnimation({ type: 'hide_bubble' });
 	}
 
+	function closeNotepad() {
+		if (notepadTimer) { clearTimeout(notepadTimer); notepadTimer = null; }
+		notepad.style.display = 'none';
+		isTyping = false;
+	}
+
 	function horseNotepad(text) {
 		notepadTextarea.value = '';
 		notepad.style.left = (pos.x - 380) + 'px';
 		notepad.style.top = Math.max(10, pos.y - 60) + 'px';
 		notepad.style.display = 'block';
 		isTyping = true;
+		// spawned boxes dismiss themselves after 5 seconds
+		if (notepadTimer) clearTimeout(notepadTimer);
+		notepadTimer = setTimeout(closeNotepad, 5000);
 
 		var i = 0;
 		var speed = 25; // ms per character (original typingSpeed 0.025s)
@@ -549,6 +560,7 @@
 		dialog.style.display = 'block';
 		dialog.querySelectorAll('button').forEach(function (btn) {
 			btn.addEventListener('click', function () {
+				if (dialogTimer) { clearTimeout(dialogTimer); dialogTimer = null; }
 				dialog.style.display = 'none';
 				if (btn.getAttribute('data-a') === 'yes') {
 					queueAnimation({ type: 'gif', name: 'smile', duration: 3000 });
@@ -557,6 +569,12 @@
 				}
 			});
 		});
+		// spawned boxes dismiss themselves after 5 seconds if left unanswered
+		if (dialogTimer) clearTimeout(dialogTimer);
+		dialogTimer = setTimeout(function () {
+			dialogTimer = null;
+			dialog.style.display = 'none';
+		}, 5000);
 	}
 
 	function introduction() {
@@ -798,10 +816,7 @@
 		dragNotepad(e.touches[0].clientX, e.touches[0].clientY);
 	}, { passive: true });
 
-	notepad.querySelector('#hh-notepad-close').addEventListener('click', function () {
-		notepad.style.display = 'none';
-		isTyping = false;
-	});
+	notepad.querySelector('#hh-notepad-close').addEventListener('click', closeNotepad);
 
 	// ---- public API + boot ---------------------------------------------------
 
